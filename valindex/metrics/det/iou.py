@@ -18,21 +18,12 @@ FloatArray: TypeAlias = NDArray[np.float64]
 def iou(pred_boxes: BoxLike | BoxesLike, target_boxes: BoxLike | BoxesLike) -> float | FloatArray:
     """计算预测框与真实框之间的 IoU。
 
-    如果两边都是单个框，则直接返回一个浮点数；否则返回
-    ``N x M`` 的 IoU 矩阵，其中 ``N`` 是预测框数量，``M`` 是真实框数量。
-
-    输入框格式统一为 ``xyxy``，即 ``[x1, y1, x2, y2]``。
+    如果两边都是单个框，返回 ``float``；否则返回形状为
+    ``(预测框数量, 真实框数量)`` 的 IoU 矩阵。
     """
 
-    iou_matrix, pred_is_single, target_is_single = _calculate_iou_matrix(
-        pred_boxes=pred_boxes,
-        target_boxes=target_boxes,
-    )
-
-    if pred_is_single and target_is_single:
-        return float(iou_matrix[0, 0])
-
-    return iou_matrix
+    iou_matrix, pred_is_single, target_is_single = _calculate_iou_matrix(pred_boxes, target_boxes)
+    return float(iou_matrix[0, 0]) if pred_is_single and target_is_single else iou_matrix
 
 
 def box_iou_matrix(pred_boxes: BoxLike | BoxesLike, target_boxes: BoxLike | BoxesLike) -> FloatArray:
@@ -42,29 +33,56 @@ def box_iou_matrix(pred_boxes: BoxLike | BoxesLike, target_boxes: BoxLike | Boxe
     输入框格式统一为 ``xyxy``，即 ``[x1, y1, x2, y2]``。
     """
 
-    iou_matrix, _, _ = _calculate_iou_matrix(
-        pred_boxes=pred_boxes,
-        target_boxes=target_boxes,
-    )
+    iou_matrix, _, _ = _calculate_iou_matrix(pred_boxes, target_boxes)
     return iou_matrix
+
+
+def box_intersection_matrix(pred_boxes: BoxLike | BoxesLike, target_boxes: BoxLike | BoxesLike) -> FloatArray:
+    """计算预测框与真实框之间的两两交集面积矩阵。"""
+
+    intersection_matrix, _, _, _ = _calculate_overlap_matrices(pred_boxes, target_boxes)
+    return intersection_matrix
+
+
+def box_union_matrix(pred_boxes: BoxLike | BoxesLike, target_boxes: BoxLike | BoxesLike) -> FloatArray:
+    """计算预测框与真实框之间的两两并集面积矩阵。"""
+
+    _, union_matrix, _, _ = _calculate_overlap_matrices(pred_boxes, target_boxes)
+    return union_matrix
 
 
 def _calculate_iou_matrix(
     pred_boxes: BoxLike | BoxesLike,
     target_boxes: BoxLike | BoxesLike,
 ) -> tuple[FloatArray, bool, bool]:
+    intersection_matrix, union_matrix, pred_is_single, target_is_single = _calculate_overlap_matrices(
+        pred_boxes,
+        target_boxes,
+    )
+
+    iou_matrix = np.divide(
+        intersection_matrix,
+        union_matrix,
+        out=np.zeros_like(intersection_matrix, dtype=np.float64),
+        where=union_matrix > 0,
+    )
+    return iou_matrix, pred_is_single, target_is_single
+
+
+def _calculate_overlap_matrices(
+    pred_boxes: BoxLike | BoxesLike,
+    target_boxes: BoxLike | BoxesLike,
+) -> tuple[FloatArray, FloatArray, bool, bool]:
     pred_array, pred_is_single = _normalize_boxes(pred_boxes, "pred_boxes")
     target_array, target_is_single = _normalize_boxes(target_boxes, "target_boxes")
 
     if pred_array.size == 0 or target_array.size == 0:
         # 任一侧为空时，直接返回对应形状的空矩阵。
-        return (
-            np.zeros((pred_array.shape[0], target_array.shape[0]), dtype=np.float64),
-            pred_is_single,
-            target_is_single,
-        )
+        empty_shape = (pred_array.shape[0], target_array.shape[0])
+        empty_matrix = np.zeros(empty_shape, dtype=np.float64)
+        return empty_matrix, empty_matrix.copy(), pred_is_single, target_is_single
 
-    # 逐对计算交集、并集和 IoU。
+    # 逐对计算交集和并集，IoU 在上层统一相除。
     pred_area = _box_area(pred_array)
     target_area = _box_area(target_array)
 
@@ -75,16 +93,7 @@ def _calculate_iou_matrix(
 
     union_area = pred_area[:, None] + target_area[None, :] - inter_area
 
-    return (
-        np.divide(
-            inter_area,
-            union_area,
-            out=np.zeros_like(inter_area, dtype=np.float64),
-            where=union_area > 0,
-        ),
-        pred_is_single,
-        target_is_single,
-    )
+    return inter_area, union_area, pred_is_single, target_is_single
 
 
 def _normalize_boxes(boxes: BoxLike | BoxesLike, name: str) -> tuple[FloatArray, bool]:

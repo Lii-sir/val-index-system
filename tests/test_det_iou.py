@@ -32,6 +32,30 @@ class DetectionIoUTest(unittest.TestCase):
         self.assertEqual(result.shape, (1, 1))
         self.assertAlmostEqual(result[0, 0], 1.0)
 
+    def test_intersection_matrix_returns_pairwise_areas(self):
+        result = metrics.det.box_intersection_matrix(
+            [[10, 10, 20, 20], [0, 0, 10, 10]],
+            [[12, 12, 22, 22], [0, 0, 10, 10]],
+        )
+
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (2, 2))
+        self.assertAlmostEqual(result[0, 0], 64.0)
+        self.assertAlmostEqual(result[0, 1], 0.0)
+        self.assertAlmostEqual(result[1, 1], 100.0)
+
+    def test_union_matrix_returns_pairwise_areas(self):
+        result = metrics.det.box_union_matrix(
+            [[10, 10, 20, 20], [0, 0, 10, 10]],
+            [[12, 12, 22, 22], [0, 0, 10, 10]],
+        )
+
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (2, 2))
+        self.assertAlmostEqual(result[0, 0], 136.0)
+        self.assertAlmostEqual(result[0, 1], 200.0)
+        self.assertAlmostEqual(result[1, 1], 100.0)
+
     def test_empty_boxes_return_empty_matrix(self):
         result = metrics.det.iou([], [[0, 0, 10, 10]])
 

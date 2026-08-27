@@ -1,26 +1,19 @@
 # -*- coding: utf-8 -*-
-"""目标检测相关指标。"""
+"""目标检测数据格式适配器。"""
 
-from . import adapters
-from .adapters import (
+from .coco import (
     build_coco_category_id_map,
     coco_annotations_to_detection,
     coco_to_detections,
-    load_detection_dataset,
-    read_image_size,
-    yolo_to_detection,
-    yolo_to_detections,
 )
-from .iou import box_iou_matrix, iou
+from .dataset import load_detection_dataset, read_image_size
+from .yolo import yolo_to_detection, yolo_to_detections
 
 __all__ = [
-    "adapters",
-    "box_iou_matrix",
     "build_coco_category_id_map",
     "coco_annotations_to_detection",
     "coco_to_detections",
     "load_detection_dataset",
-    "iou",
     "read_image_size",
     "yolo_to_detection",
     "yolo_to_detections",
